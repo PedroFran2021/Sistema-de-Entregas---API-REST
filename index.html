@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Entregas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-100 p-8">
+    <h1 class="text-3xl font-semibold text-center text-blue-600 mb-6">Sistema de Entregas</h1>
+
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Formulário de Cadastro de Entrega</h2>
+        <form id="deliveryForm" class="space-y-4">
+            <div>
+                <label for="destinatario" class="block text-gray-700 text-sm font-bold mb-2">Destinatário:</label>
+                <input type="text" id="destinatario" name="destinatario" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div>
+                <label for="endereco" class="block text-gray-700 text-sm font-bold mb-2">Endereço:</label>
+                <input type="text" id="endereco" name="endereco" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+            <div>
+                <label for="produto" class="block text-gray-700 text-sm font-bold mb-2">Produto:</label>
+                <input type="text" id="produto" name="produto" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+             <div>
+                <label for="status" class="block text-gray-700 text-sm font-bold mb-2">Status:</label>
+                <select id="status" name="status" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="pendente">Pendente</option>
+                    <option value="em_transito">Em Trânsito</option>
+                    <option value="entregue">Entregue</option>
+                    <option value="cancelado">Cancelado</option>
+                </select>
+            </div>
+            <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Cadastrar Entrega</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Lista de Entregas</h2>
+        <table id="deliveryList" class="min-w-full table-auto rounded-lg hidden">
+            <thead class="bg-gray-200">
+                <tr>
+                    <th class="px-4 py-2 text-left">Destinatário</th>
+                    <th class="px-4 py-2 text-left">Endereço</th>
+                    <th class="px-4 py-2 text-left">Produto</th>
+                    <th class="px-4 py-2 text-left">Status</th>
+                    <th class="px-4 py-2 text-left">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="text-gray-700">
+            </tbody>
+        </table>
+        <p id="noDeliveriesMessage" class="text-gray-500 text-center">Nenhuma entrega cadastrada ainda.</p>
+       <button id="generatePdf" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline mt-4">Gerar PDF</button>
+    </div>
+
+    <script>
+        const deliveryForm = document.getElementById('deliveryForm');
+        const deliveryListTable = document.getElementById('deliveryList');
+        const noDeliveriesMessage = document.getElementById('noDeliveriesMessage');
+        const tableBody = deliveryListTable.querySelector('tbody');
+        const generatePdfButton = document.getElementById('generatePdf');
+
+        let deliveries = [];
+        const apiUrl = 'http://localhost:3000/entregas';
+
+        function loadDeliveries() {
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erro ao buscar entregas: ${response.status} - ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    deliveries = data;
+                    if (deliveries.length > 0) {
+                        deliveryListTable.classList.remove('hidden');
+                        noDeliveriesMessage.classList.add('hidden');
+                        generatePdfButton.classList.remove('hidden');
+                        renderDeliveryList();
+                    } else {
+                        deliveryListTable.classList.add('hidden');
+                        noDeliveriesMessage.classList.remove('hidden');
+                        generatePdfButton.classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    console.error("Erro ao carregar entregas:", error);
+                    alert("Não foi possível carregar as entregas. Por favor, verifique a conexão com o servidor.");
+                });
+        }
+
+        function renderDeliveryList() {
+            tableBody.innerHTML = '';
+            deliveries.forEach((delivery, index) => {
+                const row = tableBody.insertRow();
+                const destinatarioCell = row.insertCell();
+                const enderecoCell = row.insertCell();
+                const produtoCell = row.insertCell();
+                const statusCell = row.insertCell();
+                const actionsCell = row.insertCell();
+
+                destinatarioCell.textContent = delivery.destinatario;
+                enderecoCell.textContent = delivery.endereco;
+                produtoCell.textContent = delivery.produto;
+                statusCell.textContent = delivery.status;
+
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Editar';
+                editButton.className = 'bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline text-xs mr-1';
+                editButton.addEventListener('click', () => editDelivery(index));
+                actionsCell.appendChild(editButton);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Excluir';
+                deleteButton.className = 'bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline text-xs';
+                deleteButton.addEventListener('click', () => deleteDelivery(index));
+                actionsCell.appendChild(deleteButton);
+            });
+            if (deliveries.length > 0) {
+                deliveryListTable.classList.remove('hidden');
+                noDeliveriesMessage.classList.add('hidden');
+                generatePdfButton.classList.remove('hidden');
+            } else {
+                deliveryListTable.classList.add('hidden');
+                noDeliveriesMessage.classList.remove('hidden');
+                generatePdfButton.classList.add('hidden');
+            }
+        }
+
+        function addDelivery(event) {
+            event.preventDefault();
+
+            const destinatario = document.getElementById('destinatario').value;
+            const endereco = document.getElementById('endereco').value;
+            const produto = document.getElementById('produto').value;
+            const status = document.getElementById('status').value;
+
+            if (!destinatario || !endereco || !produto || !status) {
+                alert('Por favor, preencha todos os campos corretamente.');
+                return;
+            }
+
+            const newDelivery = { destinatario, endereco, produto, status };
+
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(newDelivery)
+            })
+            .then(response => {
+                if (!response.ok) {
+                  return response.json().then(errData => { // Tenta obter detalhes do erro da resposta
+                    throw new Error(`Erro ao cadastrar entrega: ${response.status} - ${response.statusText}. Detalhes: ${JSON.stringify(errData)}`);
+                  });
+                }
+                return response.json();
+            })
+            .then(data => {
+                deliveries.push(data);
+                renderDeliveryList();
+                deliveryForm.reset();
+                loadDeliveries();
+            })
+            .catch(error => {
+                console.error("Erro ao adicionar entrega:", error);
+                alert(error.message || "Não foi possível adicionar a entrega. Por favor, verifique a conexão com o servidor.");
+            });
+        }
+
+        function editDelivery(index) {
+            const delivery = deliveries[index];
+            document.getElementById('destinatario').value = delivery.destinatario;
+            document.getElementById('endereco').value = delivery.endereco;
+            document.getElementById('produto').value = delivery.produto;
+            document.getElementById('status').value = delivery.status;
+
+            deliveryForm.removeEventListener('submit', addDelivery);
+            deliveryForm.addEventListener('submit', (event) => saveChanges(event, index));
+
+            const submitButton = deliveryForm.querySelector('button[type="submit"]');
+            submitButton.textContent = 'Salvar Alterações';
+        }
+
+        function saveChanges(event, index) {
+            event.preventDefault();
+
+            const destinatario = document.getElementById('destinatario').value;
+            const endereco = document.getElementById('endereco').value;
+            const produto = document.getElementById('produto').value;
+            const status = document.getElementById('status').value;
+
+            if (!destinatario || !endereco || !produto || !status) {
+                alert('Por favor, preencha todos os campos corretamente.');
+                return;
+            }
+
+            const updatedDelivery = { destinatario, endereco, produto, status };
+
+            fetch(`${apiUrl}/${deliveries[index].id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatedDelivery)
+            })
+            .then(response => {
+                if (!response.ok) {
+                  return response.json().then(errData => {
+                    throw new Error(`Erro ao atualizar entrega: ${response.status} - ${response.statusText}. Detalhes: ${JSON.stringify(errData)}`);
+                  });
+                }
+                return response.json();
+            })
+            .then(data => {
+                deliveries[index] = data;
+                renderDeliveryList();
+                deliveryForm.reset();
+                deliveryForm.removeEventListener('submit', saveChanges);
+                deliveryForm.addEventListener('submit', addDelivery);
+                const submitButton = deliveryForm.querySelector('button[type="submit"]');
+                submitButton.textContent = 'Cadastrar Entrega';
+                loadDeliveries();
+            })
+            .catch(error => {
+                console.error("Erro ao atualizar entrega:", error);
+                alert(error.message || "Não foi possível atualizar a entrega. Por favor, verifique a conexão com o servidor.");
+            });
+        }
+
+        function deleteDelivery(index) {
+            fetch(`${apiUrl}/${deliveries[index].id}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (!response.ok) {
+                  return response.json().then(errData => {
+                    throw new Error(`Erro ao excluir entrega: ${response.status} - ${response.statusText}. Detalhes: ${JSON.stringify(errData)}`);
+                  });
+                }
+                return response.json();
+            })
+            .then(() => {
+                deliveries.splice(index, 1);
+                renderDeliveryList();
+                loadDeliveries();
+            })
+            .catch(error => {
+                console.error("Erro ao excluir entrega:", error);
+                alert(error.message || "Não foi possível excluir a entrega. Por favor, verifique a conexão com o servidor.");
+            });
+        }
+
+        deliveryForm.addEventListener('submit', addDelivery);
+        loadDeliveries();
+
+        generatePdfButton.addEventListener('click', () => {
+            const pdfContent = generatePdfContent();
+            downloadPdf(pdfContent);
+        });
+
+        function generatePdfContent() {
+            let pdfContent = `
+                <!DOCTYPE html>
+                <html lang="pt-br">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Lista de Entregas</title>
+                     <style>
+                        body {
+                            font-family: 'Inter', sans-serif;
+                            margin: 0;
+                            padding: 0;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: 20px;
+                        }
+                        th, td {
+                            border: 1px solid #ddd;
+                            padding: 8px;
+                            text-align: left;
+                        }
+                        th {
+                            background-color: #f0f0f0;
+                        }
+                        h1 {
+                            text-align: center;
+                            color: #003366;
+                            margin-top: 20px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>Lista de Entregas</h1>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Destinatário</th>
+                                <th>Endereço</th>
+                                <th>Produto</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            deliveries.forEach(delivery => {
+                pdfContent += `
+                    <tr>
+                        <td>${delivery.destinatario}</td>
+                        <td>${delivery.endereco}</td>
+                        <td>${delivery.produto}</td>
+                        <td>${delivery.status}</td>
+                    </tr>
+                `;
+            });
+
+            pdfContent += `
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+            return pdfContent;
+        }
+
+        function downloadPdf(pdfContent) {
+            const blob = new Blob([pdfContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'lista_de_entregas.pdf';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
